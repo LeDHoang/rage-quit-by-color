@@ -7,7 +7,13 @@
   <title>Political Compass Color Picker</title>
   <style>
     body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 50px; }
+    .main-container { display: flex; gap: 40px; align-items: flex-start; }
     #compass { border: 1px solid #ccc; cursor: crosshair; }
+    #video { width: 320px; height: 240px; border: 1px solid #ccc; transform: scaleX(-1); }
+    #videoCanvas { width: 320px; height: 240px; position: absolute; top: 0; left: 0; pointer-events: none; transform: scaleX(-1); }
+    .video-container { display: flex; flex-direction: column; align-items: center; }
+    .video-wrapper { position: relative; }
+    .video-info { margin-top: 10px; text-align: center; font-size: 12px; color: #666; }
     #preview { width: 100px; height: 50px; border: 1px solid #ccc; margin-top: 20px; }
     #info { margin-top: 10px; text-align: center; }
     .container { display: flex; flex-direction: column; align-items: center; }
@@ -26,16 +32,25 @@
 </head>
 <body>
   <h1>Political Compass Color Picker</h1>
-  <div class="picker-container">
-    <canvas id="compass" width="400" height="400"></canvas>
-    <div class="axis-label axis-x-left">Economic Left</div>
-    <div class="axis-label axis-x-right">Economic Right</div>
-    <div class="axis-label axis-y-top">Authoritarian</div>
-    <div class="axis-label axis-y-bottom">Libertarian</div>
-    <div class="quad-label top-left">Authoritarian Left</div>
-    <div class="quad-label top-right">Authoritarian Right</div>
-    <div class="quad-label bottom-left">Libertarian Left</div>
-    <div class="quad-label bottom-right">Libertarian Right</div>
+  <div class="main-container">
+    <div class="picker-container">
+      <canvas id="compass" width="400" height="400"></canvas>
+      <div class="axis-label axis-x-left">Economic Left</div>
+      <div class="axis-label axis-x-right">Economic Right</div>
+      <div class="axis-label axis-y-top">Authoritarian</div>
+      <div class="axis-label axis-y-bottom">Libertarian</div>
+      <div class="quad-label top-left">Authoritarian Left</div>
+      <div class="quad-label top-right">Authoritarian Right</div>
+      <div class="quad-label bottom-left">Libertarian Left</div>
+      <div class="quad-label bottom-right">Libertarian Right</div>
+    </div>
+    <div class="video-container">
+      <div class="video-wrapper">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="videoCanvas" width="320" height="240"></canvas>
+      </div>
+      <div class="video-info">Point your index finger at the camera</div>
+    </div>
   </div>
   <div class="container">
     <div id="preview"></div>
@@ -43,6 +58,10 @@
       <p>Economic: 0.00<br>Social: 0.00<br>Hue: 0°<br>Saturation: 0%</p>
     </div>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script>
     (function() {
       const canvas = document.getElementById('compass');
@@ -124,8 +143,99 @@
       function onMouseUp() { window.removeEventListener('mousemove', onMouseMove); }
       canvas.addEventListener('mousedown', onMouseDown);
       window.addEventListener('mouseup', onMouseUp);
+      
+      // Camera and hand tracking setup
+      const video = document.getElementById('video');
+      const videoCanvas = document.getElementById('videoCanvas');
+      const videoCtx = videoCanvas.getContext('2d');
+      let hands, camera;
+      
+      function onResults(results) {
+        // Clear the video canvas
+        videoCtx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+        
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+          const landmarks = results.multiHandLandmarks[0];
+          // Index finger tip is landmark 8
+          const fingerTip = landmarks[8];
+          
+          // Draw circle on video canvas to show detection
+          const videoX = fingerTip.x * videoCanvas.width;
+          const videoY = fingerTip.y * videoCanvas.height;
+          
+          videoCtx.fillStyle = '#ff0000';
+          videoCtx.beginPath();
+          videoCtx.arc(videoX, videoY, 8, 0, 2 * Math.PI);
+          videoCtx.fill();
+          
+          videoCtx.strokeStyle = '#ffffff';
+          videoCtx.lineWidth = 2;
+          videoCtx.beginPath();
+          videoCtx.arc(videoX, videoY, 8, 0, 2 * Math.PI);
+          videoCtx.stroke();
+          
+          // Map normalized coordinates to color picker
+          // Flip x coordinate because video is mirrored
+          const pickerX = (1 - fingerTip.x) * width;
+          const pickerY = fingerTip.y * height;
+          
+          // Clamp to canvas bounds
+          const clampedX = Math.max(0, Math.min(width - 1, pickerX));
+          const clampedY = Math.max(0, Math.min(height - 1, pickerY));
+          
+          // Update selection based on finger position
+          selected = { x: clampedX, y: clampedY };
+          
+          const tx = clampedX / (width - 1);
+          const ty = clampedY / (height - 1);
+          const econ = tx * 20 - 10;
+          const soc = ty * 20 - 10;
+          const hue = (1 - tx) * 240;
+          const sat = ty * 100;
+          const light = 50;
+          const hslStr = `hsl(${hue.toFixed(0)}, ${sat.toFixed(0)}%, ${light}%)`;
+          
+          preview.style.background = hslStr;
+          info.innerHTML = `<p>Economic: ${econ.toFixed(2)}<br>Social: ${soc.toFixed(2)}<br>Hue: ${hue.toFixed(0)}°<br>Saturation: ${sat.toFixed(0)}%</p>`;
+          
+          renderPalette();
+          drawSelector();
+        }
+      }
+      
+      async function initCamera() {
+        try {
+          hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+          }});
+          
+          hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+          });
+          
+          hands.onResults(onResults);
+          
+          camera = new Camera(video, {
+            onFrame: async () => {
+              await hands.send({image: video});
+            },
+            width: 320,
+            height: 240
+          });
+          
+          camera.start();
+        } catch (error) {
+          console.log('Camera not available:', error);
+          document.querySelector('.video-info').textContent = 'Camera not available';
+        }
+      }
+      
       renderPalette();
       drawSelector();
+      initCamera();
     })();
   </script>
 </body>
