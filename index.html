@@ -11,11 +11,32 @@
     #preview { width: 100px; height: 50px; border: 1px solid #ccc; margin-top: 20px; }
     #info { margin-top: 10px; text-align: center; }
     .container { display: flex; flex-direction: column; align-items: center; }
+    .picker-container { position: relative; width: 400px; height: 400px; margin-top: 20px; }
+    .axis-label { position: absolute; font-weight: bold; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 4px; }
+    .axis-x-left { left: 0; top: 50%; transform: translate(-100%, -50%); }
+    .axis-x-right { right: 0; top: 50%; transform: translate(100%, -50%); }
+    .axis-y-top { top: 0; left: 50%; transform: translate(-50%, -100%); }
+    .axis-y-bottom { bottom: 0; left: 50%; transform: translate(-50%, 100%); }
+    .quad-label { position: absolute; font-size: 14px; font-weight: bold; color: #000; text-shadow: 1px 1px 2px rgba(255,255,255,0.7); text-align: center; }
+    .top-left { left: 25%; top: 25%; transform: translate(-50%, -50%); }
+    .top-right { left: 75%; top: 25%; transform: translate(-50%, -50%); }
+    .bottom-left { left: 25%; top: 75%; transform: translate(-50%, -50%); }
+    .bottom-right { left: 75%; top: 75%; transform: translate(-50%, -50%); }
   </style>
 </head>
 <body>
   <h1>Political Compass Color Picker</h1>
-  <canvas id="compass" width="400" height="400"></canvas>
+  <div class="picker-container">
+    <canvas id="compass" width="400" height="400"></canvas>
+    <div class="axis-label axis-x-left">Economic Left</div>
+    <div class="axis-label axis-x-right">Economic Right</div>
+    <div class="axis-label axis-y-top">Authoritarian</div>
+    <div class="axis-label axis-y-bottom">Libertarian</div>
+    <div class="quad-label top-left">Authoritarian Left</div>
+    <div class="quad-label top-right">Authoritarian Right</div>
+    <div class="quad-label bottom-left">Libertarian Left</div>
+    <div class="quad-label bottom-right">Libertarian Right</div>
+  </div>
   <div class="container">
     <div id="preview"></div>
     <div id="info">
